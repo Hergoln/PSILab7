@@ -1,0 +1,18 @@
+lab7:
+	zad1:
+		Długo się męczyłem i jakimiś dziwnymi sposobami i z pomocą doktora
+		doszedłem do tego rozwiązania, jest ono pod tym względem fajne, że
+		nie zużywa więcej pamięci niż potrzeba (tak mi się wydaje) bo usuwa
+		z pamięci ścieżkę, które jest błędna.
+	zad2:
+		Chwila poszperania w internecie i zastanowienia i znalazłem to
+		podejście, jest proste ale bardzo pamięcio-żerne.
+	zad3:
+		Lekka modyfikacja PriorityQueue oraz zamiana z struktury Queue na
+		PriorityQueue i voila.
+	zad4:
+		(I Have no idea what I'm writing xD) Kolejna modyfikacja tego samego
+		co poprzednio podejścia, tym razem jednak korzystamy z funkcji 
+		korzystającej z heurystyki.
+	zad5:
+		
