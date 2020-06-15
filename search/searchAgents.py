@@ -288,7 +288,7 @@ class CornersProblem(search.SearchProblem):
         # Please add any code here which you would like to use
         # in initializing the problem
         
-        self.startState = startingGameState.getPacmanPosition()
+        self.startState = ((startingGameState.getPacmanPosition(), ()))
         self.costFn = lambda x: 1
         self._visited, self._visitedlist, self._expanded = {}, [], 0 # DO NOT CHANGE
 
@@ -296,27 +296,12 @@ class CornersProblem(search.SearchProblem):
         return self.startState
 
     def isGoalState(self, state):
-        """
-        Returns whether this search state is a goal state of the problem.
-        """
-        
-        temp = list(self.corners)
-        if state in temp:
-            temp.remove(state)
-        if len(temp) is not len(self.corners):
-            self.corners = tuple(temp)
-            
-        isGoal = len(self.corners) <= 0
-            
-        if isGoal:
-            self._visitedlist.append(state)
-            import __main__
-            if '_display' in dir(__main__):
-                if 'drawExpandedCells' in dir(__main__._display): #@UndefinedVariable
-                    __main__._display.drawExpandedCells(self._visitedlist) #@UndefinedVariable
-        
-        return isGoal
+        # state = (((x, y), [list of visited corners]))
+        return len(state[1]) == 4
 
+
+    # state will be something like this (((x, y), [list of visited corners]))
+    # double parentheses cause my algorithm takes successor[0] 
     def getSuccessors(self, state):
         """
         Returns successor states, the actions they require, and a cost of 1.
@@ -328,21 +313,28 @@ class CornersProblem(search.SearchProblem):
             is the incremental cost of expanding to that successor
         """
 
+        # state = (((x, y), (list of visited corners)))
         successors = []
+        visitedCorners = state[1]
+        
+        if state[0] in self.corners and not state[0] in visitedCorners:
+            temp = list(visitedCorners)
+            temp.append(state[0])
+            visitedCorners = tuple(temp)
+            
         for action in [Directions.NORTH, Directions.SOUTH, Directions.EAST, Directions.WEST]:
-            x,y = state
+            x,y = state[0]
             dx, dy = Actions.directionToVector(action)
             nextx, nexty = int(x + dx), int(y + dy)
             if not self.walls[nextx][nexty]:
-                nextState = (nextx, nexty)
-                cost = self.costFn(nextState)
-                successors.append( ( nextState, action, cost) )
+                nextState = ((nextx, nexty), visitedCorners)
+                successors.append( (nextState, action, self.costFn(nextState[0])) )
 
         # Bookkeeping for display purposes
         self._expanded += 1 # DO NOT CHANGE
-        if state not in self._visited:
-            self._visited[state] = True
-            self._visitedlist.append(state)
+        if not state[0] in self._visited:
+            self._visited[state[0]] = True
+            self._visitedlist.append(state[0])
 
         return successors
 
@@ -375,9 +367,20 @@ def cornersHeuristic(state, problem):
     """
     corners = problem.corners # These are the corner coordinates
     walls = problem.walls # These are the walls of the maze, as a Grid (game.py)
-
-    "*** YOUR CODE HERE ***"
-    return 0 # Default to trivial solution
+    curr_pos = state[0]
+    
+    if curr_pos in problem.corners:
+        return 0
+    
+    minDist = 99999
+    for corner in problem.corners:
+        # ( (curr_pos[0] - corner[0]) ** 2 + (curr_pos[1] - corner[1]) ** 2 ) ** 0.5
+        # abs(curr_pos[0] - corner[0]) + abs(curr_pos[1] - corner[1])
+        cornerDist = ( (curr_pos[0] - corner[0]) ** 2 + (curr_pos[1] - corner[1]) ** 2 ) ** 0.5
+        if cornerDist < minDist:
+            minDist = cornerDist
+    
+    return minDist
 
 class AStarCornersAgent(SearchAgent):
     "A SearchAgent for FoodSearchProblem using A* and your foodHeuristic"
@@ -469,10 +472,23 @@ def foodHeuristic(state, problem):
     Subsequent calls to this heuristic can access
     problem.heuristicInfo['wallCount']
     """
+    #foodGrid is a Grid, that means it has attribute data -> list(boolean) indicating where food is
     position, foodGrid = state
     "*** YOUR CODE HERE ***"
-    return 0
-
+    minDist = 99999
+    
+    if len(foodGrid.asList()) == 0:
+        return 0
+    
+    # ( (position[0] - food[0]) ** 2 + (position[1] - food[1]) ** 2 ) ** 0.5
+    # abs(position[0] - food[0]) + abs(position[1] - food[1])
+    for food in foodGrid.asList():
+        foodDist = abs(position[0] - food[0]) + abs(position[1] - food[1])
+        if foodDist < minDist:
+            minDist = foodDist
+    
+    return minDist
+        
 class ClosestDotSearchAgent(SearchAgent):
     "Search for all food using a sequence of searches"
     def registerInitialState(self, state):
@@ -500,9 +516,12 @@ class ClosestDotSearchAgent(SearchAgent):
         food = gameState.getFood()
         walls = gameState.getWalls()
         problem = AnyFoodSearchProblem(gameState)
-
-        "*** YOUR CODE HERE ***"
-        util.raiseNotDefined()
+        
+        return search.aStarSearch(problem, anyFoodHeuristic)
+    
+def anyFoodHeuristic(state, problem):
+    return 0
+    
 
 class AnyFoodSearchProblem(PositionSearchProblem):
     """
@@ -536,9 +555,7 @@ class AnyFoodSearchProblem(PositionSearchProblem):
         complete the problem definition.
         """
         x,y = state
-
-        "*** YOUR CODE HERE ***"
-        util.raiseNotDefined()
+        return self.food[x][y]
 
 def mazeDistance(point1, point2, gameState):
     """

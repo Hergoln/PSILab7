@@ -18,7 +18,7 @@ Pacman agents (in searchAgents.py).
 """
 
 import util
-from util import Queue, manhattanDistance, PriorityQueue
+from util import Queue, manhattanDistance, PriorityQueue, PriorityQueueWithFunction, Stack
 from game import Actions, Directions
 import copy
 import heapq
@@ -76,7 +76,7 @@ def tinyMazeSearch(problem):
     w = Directions.WEST
     return  [s, s, w, s, w, w, s, w]
 
-def depthFirstSearch(problem):
+def uglyDepthFirstSearch(problem):
     """
     Search the deepest nodes in the search tree first.
 
@@ -122,7 +122,6 @@ def depthFirstSearch(problem):
             while not out.isEmpty():
                 pair = out.pop()
                 dirs.append(Actions.vectorToDirection((pair[1][0][0] - pair[0][0][0], pair[1][0][1] - pair[0][0][1])))
-            print(dirs)
             return dirs
         
         successors = problem.getSuccessors(current_state[0])
@@ -143,46 +142,56 @@ def depthFirstSearch(problem):
         current_state = child[1]
         
     ###
+def depthFirstSearch(problem):
+    # queue is queue of states
+    queue = Stack()
+    current_state = problem.getStartState()
+    actions = []
+    visited = []
+    queue.push((current_state, actions))
+    
+    while queue:
+        current_state, actions = queue.pop()
+        if current_state not in visited:
+            visited.append(current_state)
+            if problem.isGoalState(current_state):
+                return actions
+            
+            for successor in problem.getSuccessors(current_state):
+                state, action, _ = successor
+                newActions = actions + [action]
+                queue.push((state, newActions))
+                
+    return []
+
 
 def breadthFirstSearch(problem):
     # queue is queue of states
     queue = Queue()
-    current_state = [] # array of arrays
-    current_state.append(problem.getStartState())
-    queue.push(current_state)
-    while True:
-        # current_state is an array
-        current_state = queue.pop()
+    current_state = problem.getStartState()
+    actions = []
+    visited = []
+    # queue of pairs -> (state, [actions])
+    queue.push((current_state, actions))
+    
+    while queue:
+        current_state, actions = queue.pop()
         #successor:
         #   coords: (x, y)
         #   Direction: game.Directions
         #   cost: int
-        for successor in problem.getSuccessors(current_state[len(current_state) - 1]):
-            state_copy = copy.deepcopy(current_state)
-            if successor[0] not in state_copy:
-                state_copy.append(successor[0])
-                queue.push(state_copy)
+        if current_state not in visited:
+            visited.append(current_state)
+            if problem.isGoalState(current_state):
+                return actions
             
-            if problem.isGoalState(successor[0]):
-                # from coord to dirs
-                return extractDirections(state_copy)
+            for successor in problem.getSuccessors(current_state):
+                state, action, _ = successor
+                newActions = actions + [action]
+                queue.push((state, newActions))
+                
+    return []
     
-def initQueueWith(states) -> Queue:
-    newQueue = Queue()
-    for each in states:
-        newQueue.push(each)
-    return newQueue
-
-def extractDirections(states) -> list:
-    helper = initQueueWith(states)
-    coordBeg = helper.pop()
-    dirs = []
-    while not helper.isEmpty():
-        coordEnd = helper.pop()
-        dirs.append(Actions.vectorToDirection((coordEnd[0] - coordBeg[0], coordEnd[1] - coordBeg[1])))
-        coordBeg = coordEnd
-    return dirs
-
 class PriorityQueueNetflixAdaptation(PriorityQueue):
     def  __init__(self):
         PriorityQueue.__init__(self)
@@ -192,29 +201,27 @@ class PriorityQueueNetflixAdaptation(PriorityQueue):
         return (item, priority)
 
 def uniformCostSearch(problem):
-    """Search the node of least total cost first."""
-    # queue is queue of states
-    p_queue = PriorityQueueNetflixAdaptation()
-    current_state = [] # array of arrays
-    current_state.append(problem.getStartState())
-    p_queue.push(current_state, 0)
-    while True:
-        # current_state is an array
-        # I modified PriorityQueue so pop now returns tuple (item, priority)
-        current_state, priority = p_queue.pop()
-        #successor:
-        #   coords: (x, y)
-        #   Direction: game.Directions
-        #   cost: int
-        for successor in problem.getSuccessors(current_state[len(current_state) - 1]):
-            state_copy = copy.deepcopy(current_state)
-            if successor[0] not in state_copy:
-                state_copy.append(successor[0])
-                p_queue.push(state_copy, priority + successor[2])
+    queue = PriorityQueue()
+    current_state = problem.getStartState()
+    actions = []
+    visited = []
+    queue.push((current_state, actions), 0)
+    
+    while queue:
+        current_state, actions = queue.pop()
+
+        if current_state not in visited:
+            visited.append(current_state)
+            if problem.isGoalState(current_state):
+                return actions
             
-            if problem.isGoalState(successor[0]):
-                # from coord to dirs
-                return extractDirections(state_copy)
+            for successor in problem.getSuccessors(current_state):
+                state, action, cost = successor
+                cost += problem.getCostOfActions(actions)
+                newActions = actions + [action]
+                queue.push((state, newActions), cost)
+                
+    return []
 
 def nullHeuristic(state, problem=None):
     """
@@ -223,9 +230,8 @@ def nullHeuristic(state, problem=None):
     """
     return 0
 
-def aStarSearch(problem, heuristic=nullHeuristic):
+def oldAStarSearch(problem, heuristic=nullHeuristic):
     """Search the node that has the lowest combined cost and heuristic first."""
-    from util import PriorityQueueWithFunction
     # i is state = ((x, y), dir, cost)
     priorityFunc = lambda item: sum(i[2] for i in item) + heuristic(item[len(item) - 1][0], problem)
         
@@ -251,6 +257,34 @@ def aStarSearch(problem, heuristic=nullHeuristic):
             if problem.isGoalState(successor[0]):
                 # from coord to dirs
                 return list(map(lambda item: item[1], state_copy))
+
+def aStarSearch(problem, heuristic=nullHeuristic):
+    priorityFunc = lambda state: problem.getCostOfActions(state[1]) + heuristic(state[0], problem)
+    queue = PriorityQueueWithFunction(priorityFunc)
+    current_state = problem.getStartState()
+    actions = []
+    visited = []
+    # state depends on problem now but actions list is independent thus priorityFunc should work on every problem
+    # queue of pairs -> (state, [actions])
+    queue.push((current_state, actions))
+    
+    while queue:
+        current_state, actions = queue.pop()
+        #successor:
+        #   coords: (x, y)
+        #   Direction: game.Directions
+        #   cost: int
+        if current_state not in visited:
+            visited.append(current_state)
+            if problem.isGoalState(current_state):
+                return actions
+            
+            for successor in problem.getSuccessors(current_state):
+                state, action, _ = successor
+                newActions = actions + [action]
+                queue.push((state, newActions))
+                
+    return []
 
 # Abbreviations
 bfs = breadthFirstSearch
